@@ -26,7 +26,7 @@ img{max-width:100%}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Quicksand:wght@500;600;700&display=swap">
 <style>
-/* Layout: one game card centered on a powder-blue room; touch pad under the card on touch devices.
+/* Layout: one game card centered on a powder-blue room; on touch devices it fills the screen with floating controls.
    Single deliberate look (Luru's apricot fur on powder blue), set explicitly for every host theme. */
 :root{
   --room:#DCE8F1; --room-2:#EEF4F8;
@@ -132,19 +132,33 @@ kbd{font-family:var(--f-num);font-weight:700;font-size:11px;padding:2px 6px;bord
   .how{display:none} .rank{align-self:stretch}
 }
 
-/* touch pad */
-#pad{display:none;width:100%;max-width:760px;gap:10px;flex:0 0 auto}
-.touch #pad.on{display:flex}
-.grp{display:flex;gap:8px;flex:1;min-width:0}
-.pad{flex:1;min-width:0;height:62px;border:0;border-radius:18px;background:var(--milk);color:var(--ink);font-family:var(--f-display);font-size:17px;
-  display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 5px 0 rgba(46,58,75,.13);touch-action:none;white-space:nowrap}
-.pad svg{width:18px;height:18px;flex:0 0 auto}
-.pad.jump{background:var(--apricot);color:var(--milk);box-shadow:0 5px 0 var(--apricot-deep);flex:1.3}
-.pad.item{background:#EAF2F8}
-.pad.on{transform:translateY(3px);box-shadow:0 2px 0 rgba(46,58,75,.13)}
-.pad.jump.on{box-shadow:0 2px 0 var(--apricot-deep)}
-.grp.two .pad{height:56px;font-size:15px}
-.grp.two .tag{font-family:var(--f-num);font-weight:700;font-size:12px;align-self:center;color:var(--ink-soft)}
+/* touch: the game fills the screen and the controls float inside it */
+body.touch{padding:0 env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+.touch #app{gap:0}
+.touch #card{border-radius:0;box-shadow:none}
+#pad{display:none;position:absolute;inset:0;pointer-events:none;z-index:2}
+.touch #pad.on{display:block}
+.pad{position:absolute;pointer-events:auto;border:0;border-radius:50%;padding:0;color:var(--ink);font-family:var(--f-display);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:none;white-space:nowrap;
+  background:rgba(255,253,251,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 0 2px rgba(255,255,255,.6),0 6px 16px -6px rgba(46,58,75,.35);transition:transform .06s}
+.pad svg{width:24px;height:24px}
+.pad span{font-size:12px;line-height:1}
+.pad.on{transform:scale(.92);background:rgba(255,253,251,.75)}
+.pad.jump{background:rgba(227,154,85,.78);color:var(--milk)}
+.pad.jump.on{background:rgba(227,154,85,.95)}
+.pad.item{background:rgba(214,226,240,.6)}
+/* one player: slide bottom-left, jump bottom-right, item beside jump */
+.pad.s1{left:16px;bottom:16px;width:80px;height:80px}
+.pad.j1{right:16px;bottom:16px;width:92px;height:92px}
+.pad.i1{right:120px;bottom:22px;width:64px;height:64px}
+/* two players: 1P column on the left edge, 2P column on the right edge */
+.pad.duo{width:62px;height:62px}
+.pad.duo span{font-size:11px}
+.pad.p1{left:12px} .pad.p2{right:12px}
+.pad.duo.jump{top:calc(50% - 104px)} .pad.duo.item{top:calc(50% - 31px)} .pad.duo.slide{top:calc(50% + 42px)}
+.ptag{position:absolute;top:calc(50% - 132px);font-family:var(--f-num);font-weight:700;font-size:12px;color:var(--ink);background:rgba(255,253,251,.75);padding:2px 8px;border-radius:9px}
+.ptag.p1{left:24px} .ptag.p2{right:24px}
 @media (prefers-reduced-motion:reduce){ .btn,.mode,.st{transition:none} }
 </style>
 
@@ -152,6 +166,7 @@ kbd{font-family:var(--f-num);font-weight:700;font-size:11px;padding:2px 6px;bord
   <div id="stage">
     <div id="card">
       <canvas id="cv" aria-label="츄르먹는 루루 게임 화면"></canvas>
+      <div id="pad"></div>
       <button class="icon-btn" id="pauseBtn" aria-label="일시정지" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.5" height="12" rx="1.5" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1.5" fill="currentColor"/></svg>
       </button>
@@ -225,7 +240,6 @@ kbd{font-family:var(--f-num);font-weight:700;font-size:11px;padding:2px 6px;bord
       </div>
     </div>
   </div>
-  <div id="pad"></div>
 </div>
 
 <script>
@@ -363,19 +377,21 @@ function starTotal(){return save.stars.solo.reduce((a,b)=>a+b,0)+save.stars.race
    ===================================================================== */
 const cv=$('cv'), ctx=cv.getContext('2d');
 const VH=400, GROUND=330;
-let W=720, views=1, scale=1, dpr=1, PX=170, SPD=1;
+let W=720, views=1, scale=1, dpr=1, PX=170, SPD=1, split='v', CW=720, CH=400;
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart' in window);
 if(isTouch) document.body.classList.add('touch');
 function resize(){
-  const st=$('stage'), aw=st.clientWidth, ah=st.clientHeight, H=VH*views;
-  W=Math.round(Math.max(480,Math.min(1000,aw/ah*H)));
-  scale=Math.min(aw/W,ah/H);
-  const cw=Math.floor(W*scale), ch=Math.floor(H*scale);
+  const st=$('stage'), aw=st.clientWidth, ah=st.clientHeight;
+  // two players on a wide screen (phone held sideways) sit side by side; otherwise views stack
+  if(views===2&&aw/ah>=1.9){ split='h'; CH=VH; W=Math.round(Math.max(380,Math.min(1000,aw/ah*VH/2))); CW=W*2 }
+  else { split='v'; CH=VH*views; W=Math.round(Math.max(480,Math.min(isTouch?1900:1000,aw/ah*CH))); CW=W }
+  scale=Math.min(aw/CW,ah/CH);
+  const cw=Math.floor(CW*scale), ch=Math.floor(CH*scale);
   $('card').style.width=cw+'px'; $('card').style.height=ch+'px';
   dpr=Math.min(2.5,window.devicePixelRatio||1);
   cv.width=Math.round(cw*dpr); cv.height=Math.round(ch*dpr);
-  PX=W<640?120:170; SPD=Math.max(.72,Math.min(1,W/780));
+  PX=W<480?(isTouch?160:130):isTouch?(W<640?150:210):(W<640?120:170); SPD=Math.max(.72,Math.min(1,W/780));
 }
 addEventListener('resize',()=>{resize()});
 
@@ -948,7 +964,7 @@ function drawCat(c,r,x,y,t,alpha,sc){
    ===================================================================== */
 function renderView(vi,focus,t){
   const S=STAGES[G.stage], cam=focus.x-PX;
-  ctx.save(); ctx.translate(0,vi*VH); ctx.beginPath(); ctx.rect(0,0,W,VH); ctx.clip();
+  ctx.save(); if(split==='h') ctx.translate(vi*W,0); else ctx.translate(0,vi*VH); ctx.beginPath(); ctx.rect(0,0,W,VH); ctx.clip();
   if(G.shake>0&&!reduced&&focus.human) ctx.translate((Math.random()-.5)*G.shake*24,(Math.random()-.5)*G.shake*24);
   drawBG(ctx,S,cam);
   // start + finish lines
@@ -1046,7 +1062,7 @@ function nameTag(r,x,y,me){
   ctx.fillStyle=me?'#FFFDFB':'#2E3A4B'; ctx.textAlign='center'; ctx.fillText(txt,x+20,y-3);
 }
 function drawHUD(r,vi,t){
-  const top=10, rightPad=vi===0?66:12;
+  const top=10, rightPad=(split==='h'?vi===views-1:vi===0)?66:12;
   ctx.textAlign='left';
   // left: place or hearts
   if(G.mode==='solo'){ for(let i=0;i<3;i++){ctx.globalAlpha=i<r.hearts?1:.25;ctx.fillStyle='#F2A3A0';heartPath(ctx,22+i*26,top+14,1);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke()} ctx.globalAlpha=1 }
@@ -1095,13 +1111,13 @@ function drawHUD(r,vi,t){
   const tw=ctx.measureText(ctext).width; ctx.fillStyle='rgba(255,253,251,.85)'; rr(ctx,sx-tw-42,top+12,tw+34,26,13); ctx.fill();
   ctx.fillStyle='#2E3A4B'; ctx.fillText(ctext,sx-14,top+30); drawChuru(ctx,sx-tw-26,top+25,2,false,0,0);
   // timers for effects
-  let ex=10; const ey=VH-38;
+  let ex=10; const ey=isTouch?top+48:VH-38;
   const chip=(label,frac,col)=>{ctx.font='12px '+FONT_DISP;const w=ctx.measureText(label).width+38;ctx.fillStyle='rgba(255,253,251,.85)';rr(ctx,ex,ey,w,24,12);ctx.fill();ctx.fillStyle=col;rr(ctx,ex+6,ey+15,(w-12)*frac,4,2);ctx.fill();ctx.fillStyle='#2E3A4B';ctx.textAlign='left';ctx.fillText(label,ex+10,ey+13);ex+=w+6};
   if(r.boost>0) chip('마따따비',r.boost/2.2,'#6FB38E');
   if(r.shield>0) chip('쿠션',r.shield/10,'#8DB8E4');
   if(r.magnet>0) chip('츄르 자석',r.magnet/7,'#E05A5A');
   if(r.fever>0) chip('츄르 러시',r.fever/5,'#F2B544');
-  if(G.mode!=='solo'&&r.coins>0){ctx.textAlign='right';ctx.font='600 11px '+FONT_NUM;ctx.fillStyle='#6B7A8C';ctx.fillText('츄르 속도 +'+(r.coins*1.2).toFixed(0)+'%',W-12,VH-14)}
+  if(G.mode!=='solo'&&r.coins>0&&!isTouch){ctx.textAlign='right';ctx.font='600 11px '+FONT_NUM;ctx.fillStyle='#6B7A8C';ctx.fillText('츄르 속도 +'+(r.coins*1.2).toFixed(0)+'%',W-12,VH-14)}
 }
 function render(now){
   const t=now/1000;
@@ -1110,13 +1126,13 @@ function render(now){
     const S=STAGES[menuStage]; drawBG(ctx,S,t*60); return }
   const foci=G.mode==='duo'?[G.racers[0],G.racers[1]]:[G.racers[0]];
   foci.forEach((f,i)=>renderView(i,f,t));
-  if(G.mode==='duo'){ctx.fillStyle='#FFFDFB';ctx.fillRect(0,VH-2,W,4)}
+  if(G.mode==='duo'){ctx.fillStyle='#FFFDFB';if(split==='h')ctx.fillRect(W-2,0,4,VH);else ctx.fillRect(0,VH-2,W,4)}
   if(G.phase==='count'){const c=Math.ceil(G.count), f=G.count%1;
-    ctx.fillStyle='rgba(46,58,75,.12)'; ctx.fillRect(0,0,W,VH*views);
-    ctx.save(); ctx.translate(W/2,VH*views/2); ctx.scale(1+f*.4,1+f*.4); ctx.globalAlpha=Math.min(1,f*2+.2);
+    ctx.fillStyle='rgba(46,58,75,.12)'; ctx.fillRect(0,0,CW,CH);
+    ctx.save(); ctx.translate(CW/2,CH/2); ctx.scale(1+f*.4,1+f*.4); ctx.globalAlpha=Math.min(1,f*2+.2);
     ctx.font='90px '+FONT_DISP; ctx.textAlign='center'; ctx.lineWidth=10; ctx.strokeStyle='#FFFDFB'; ctx.strokeText(c,0,30); ctx.fillStyle='#E39A55'; ctx.fillText(c,0,30); ctx.restore();
-    ctx.font='18px '+FONT_DISP; ctx.fillStyle='#2E3A4B'; ctx.textAlign='center'; ctx.fillText('Stage '+(G.stage+1)+' · '+STAGES[G.stage].name,W/2,VH*views/2+80)}
-  if(G.goT>0){ctx.save();ctx.globalAlpha=Math.min(1,G.goT*2);ctx.font='80px '+FONT_DISP;ctx.textAlign='center';ctx.lineWidth=10;ctx.strokeStyle='#FFFDFB';ctx.strokeText('출발!',W/2,VH*views/2+20);ctx.fillStyle='#E39A55';ctx.fillText('출발!',W/2,VH*views/2+20);ctx.restore()}
+    ctx.font='18px '+FONT_DISP; ctx.fillStyle='#2E3A4B'; ctx.textAlign='center'; ctx.fillText('Stage '+(G.stage+1)+' · '+STAGES[G.stage].name,CW/2,CH/2+80)}
+  if(G.goT>0){ctx.save();ctx.globalAlpha=Math.min(1,G.goT*2);ctx.font='80px '+FONT_DISP;ctx.textAlign='center';ctx.lineWidth=10;ctx.strokeStyle='#FFFDFB';ctx.strokeText('출발!',CW/2,CH/2+20);ctx.fillStyle='#E39A55';ctx.fillText('출발!',CW/2,CH/2+20);ctx.restore()}
 }
 
 /* =====================================================================
@@ -1238,17 +1254,19 @@ const IC={
 function buildPad(){
   const pad=$('pad'); pad.innerHTML=''; pad.classList.toggle('on',state==='play'||state==='pause');
   if(!(state==='play'||state==='pause')||!G) return;
-  const grp=(r,two,label)=>{const g=document.createElement('div');g.className='grp'+(two?' two':'');
-    if(label) g.insertAdjacentHTML('beforeend',`<span class="tag">${label}</span>`);
-    const mk=(cls,html,aria,down,up)=>{const b=document.createElement('button');b.className='pad '+cls;b.innerHTML=html;b.setAttribute('aria-label',aria);
-      b.addEventListener('pointerdown',e=>{e.preventDefault();ensureAudio();b.classList.add('on');try{b.setPointerCapture(e.pointerId)}catch(_){}down()});
-      const off=()=>{b.classList.remove('on');up&&up()}; b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
-      b.addEventListener('contextmenu',e=>e.preventDefault()); g.appendChild(b)};
-    mk('',IC.down+(two?'':'슬라이드'),'슬라이드',()=>{r.downKey=true;slide(r,.15)},()=>{r.downKey=false});
-    if(G.mode!=='solo'||true) mk('item',IC.item+(two?'':'아이템'),'아이템',()=>useItem(r));
-    mk('jump',IC.up+(two?'':'점프'),'점프',()=>jump(r),()=>jumpUp(r));
-    pad.appendChild(g)};
-  if(G.mode==='duo'){grp(G.racers[0],true,'1P');grp(G.racers[1],true,'2P')} else grp(G.racers[0],false);
+  const mk=(cls,html,label,aria,down,up)=>{const b=document.createElement('button');b.className='pad '+cls;b.innerHTML=html+(label?`<span>${label}</span>`:'');b.setAttribute('aria-label',aria);
+    b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();ensureAudio();b.classList.add('on');try{b.setPointerCapture(e.pointerId)}catch(_){}down()});
+    const off=()=>{b.classList.remove('on');up&&up()}; b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
+    b.addEventListener('contextmenu',e=>e.preventDefault()); pad.appendChild(b)};
+  const set=(r,c)=>{
+    mk(c.s,IC.down,'슬라이드',(c.tag||'')+'슬라이드',()=>{r.downKey=true;slide(r,.15)},()=>{r.downKey=false});
+    mk(c.i,IC.item,'아이템',(c.tag||'')+'아이템',()=>useItem(r));
+    mk(c.j,IC.up,'점프',(c.tag||'')+'점프',()=>jump(r),()=>jumpUp(r));
+  };
+  if(G.mode==='duo'){
+    set(G.racers[0],{s:'duo p1 slide',i:'duo p1 item',j:'duo p1 jump',tag:'1P '}); set(G.racers[1],{s:'duo p2 slide',i:'duo p2 item',j:'duo p2 jump',tag:'2P '});
+    pad.insertAdjacentHTML('beforeend','<span class="ptag p1">1P</span><span class="ptag p2">2P</span>');
+  } else set(G.racers[0],{s:'s1',i:'item i1',j:'jump j1'});
 }
 
 /* boot */
