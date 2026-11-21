@@ -392,6 +392,7 @@ try{
       save.unlocked=MAP[Math.min(4,(s2.unlocked||1)-1)]+1; save.sound=s2.sound!==false } }
 }catch(e){}
 for(const k of ['solo','race']) while(save.stars[k].length<10) save.stars[k].push(0);
+const TEST=/[?&]test\b/.test(location.search); const unlockedN=()=>TEST?STAGES.length:save.unlocked;
 function persist(){try{localStorage.setItem('luru-run-v3',JSON.stringify(save))}catch(e){}}
 function starTotal(){return save.stars.solo.reduce((a,b)=>a+b,0)+save.stars.race.reduce((a,b)=>a+b,0)}
 
@@ -1627,7 +1628,7 @@ function endRace(){
   $('resEyebrow').textContent=eyebrow; $('resTitle').textContent=title; $('resImg').src=img;
   $('resStars').innerHTML=G.mode==='duo'?'':'★'.repeat(stars)+'<i>'+'★'.repeat(3-stars)+'</i>';
   $('resStars').hidden=G.mode==='duo';
-  const canNext=si+1<STAGES.length&&si+1<save.unlocked&&(cleared||G.mode==='duo');
+  const canNext=si+1<STAGES.length&&si+1<unlockedN()&&(cleared||G.mode==='duo');
   $('nextBtn').hidden=!canNext;
   $('nextBtn').textContent=canNext?'다음 스테이지':'';
   show('resOv',1); buildPad();
@@ -1641,7 +1642,7 @@ function openStages(mode){
     :'<span><kbd>Space</kbd> <kbd>↑</kbd> 점프 · 공중에서 한 번 더 2단</span><span><kbd>↓</kbd> 슬라이드</span><span><kbd>X</kbd> <kbd>Shift</kbd> 아이템</span><span><kbd>P</kbd> 쉬기</span>';
   const box=$('stages'); box.innerHTML='';
   STAGES.forEach((S,i)=>{
-    const locked=i+1>save.unlocked, st=mode==='duo'?0:save.stars[mode==='solo'?'solo':'race'][i];
+    const locked=i+1>unlockedN(), st=mode==='duo'?0:save.stars[mode==='solo'?'solo':'race'][i];
     const b=document.createElement('button'); b.className='st'+(S.kind==='boss'?' boss':''); b.disabled=locked;
     b.innerHTML=`<canvas width="320" height="180" data-i="${i}"></canvas><span class="in"><span class="n">STAGE ${i+1}${S.kind==='boss'?' · BOSS':''}${locked?' · 잠김':''}</span><b>${S.name}</b>${mode==='duo'?'<span class="stars">&nbsp;</span>':`<span class="stars">${'★'.repeat(st)}<i>${'★'.repeat(3-st)}</i></span>`}</span>`;
     b.setAttribute('aria-label',`스테이지 ${i+1} ${S.name}${locked?' 잠김':''}`);
