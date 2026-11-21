@@ -392,7 +392,7 @@ try{
       save.unlocked=MAP[Math.min(4,(s2.unlocked||1)-1)]+1; save.sound=s2.sound!==false } }
 }catch(e){}
 for(const k of ['solo','race']) while(save.stars[k].length<10) save.stars[k].push(0);
-const TEST=true; // 테스트 기간: 모든 스테이지 열림 (원복 시 /[?&]test\b/.test(location.search)) const unlockedN=()=>TEST?STAGES.length:save.unlocked;
+const TEST=true; const unlockedN=()=>TEST?STAGES.length:save.unlocked;
 function persist(){try{localStorage.setItem('luru-run-v3',JSON.stringify(save))}catch(e){}}
 function starTotal(){return save.stars.solo.reduce((a,b)=>a+b,0)+save.stars.race.reduce((a,b)=>a+b,0)}
 
